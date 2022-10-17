@@ -1,0 +1,4 @@
+#ifndef HW1_MATRIX_3D_ADD_CUH
+#define HW1_MATRIX_3D_ADD_CUH
+
+#endif //HW1_MATRIX_3D_ADD_CUH
