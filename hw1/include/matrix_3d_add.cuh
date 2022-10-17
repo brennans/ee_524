@@ -1,7 +1,7 @@
 #ifndef HW1_MATRIX_3D_ADD_CUH
 #define HW1_MATRIX_3D_ADD_CUH
 
-__global__ void matrix_3d_add(int *c, const int* a, const int* b, const int M, const int N, const int P)
+__global__ void matrix_3d_add(float *c, const float* a, const float* b, const int M, const int N, const int P)
 {
     int columnIndex = blockDim.x * blockIdx.x + threadIdx.x;
     int rowIndex = blockDim.y * blockIdx.y + threadIdx.y;
@@ -14,11 +14,11 @@ __global__ void matrix_3d_add(int *c, const int* a, const int* b, const int M, c
 }
 
 
-cudaError_t runMatrix3dAdd(int *c, const int *a, const int *b, uint32_t m, uint32_t n, uint32_t p, uint32_t threadDim)
+cudaError_t runMatrix3dAdd(float *c, const float *a, const float *b, uint32_t m, uint32_t n, uint32_t p, uint32_t threadDim)
 {
-    int *dev_a = 0;
-    int *dev_b = 0;
-    int *dev_c = 0;
+    float *dev_a = 0;
+    float *dev_b = 0;
+    float *dev_c = 0;
     cudaError_t cudaStatus;
 
     uint32_t size = m * n * p;
@@ -27,13 +27,13 @@ cudaError_t runMatrix3dAdd(int *c, const int *a, const int *b, uint32_t m, uint3
 
 
     // Allocate GPU buffers for three vectors (two input, one output)    .
-    checkCuda(cudaMalloc((void**)&dev_c, size * sizeof(int)));
-    checkCuda(cudaMalloc((void**)&dev_a, size * sizeof(int)));
-    checkCuda(cudaMalloc((void**)&dev_b, size * sizeof(int)));
+    checkCuda(cudaMalloc((void**)&dev_c, size * sizeof(float)));
+    checkCuda(cudaMalloc((void**)&dev_a, size * sizeof(float)));
+    checkCuda(cudaMalloc((void**)&dev_b, size * sizeof(float)));
 
     // Copy input vectors from host memory to GPU buffers.
-    checkCuda(cudaMemcpy(dev_a, a, size * sizeof(int), cudaMemcpyHostToDevice));
-    checkCuda(cudaMemcpy(dev_b, b, size * sizeof(int), cudaMemcpyHostToDevice));
+    checkCuda(cudaMemcpy(dev_a, a, size * sizeof(float), cudaMemcpyHostToDevice));
+    checkCuda(cudaMemcpy(dev_b, b, size * sizeof(float), cudaMemcpyHostToDevice));
 
     // Launch a kernel on the GPU with one thread for each element.
     matrix_3d_add<<<numBlocks, numThreads>>>(dev_c, dev_a, dev_b, m, n, p);
@@ -47,7 +47,7 @@ cudaError_t runMatrix3dAdd(int *c, const int *a, const int *b, uint32_t m, uint3
     checkCuda(cudaDeviceSynchronize());
 
     // Copy output vector from GPU buffer to host memory.
-    checkCuda(cudaMemcpy(c, dev_c, size * sizeof(int), cudaMemcpyDeviceToHost));
+    checkCuda(cudaMemcpy(c, dev_c, size * sizeof(float), cudaMemcpyDeviceToHost));
 
     cudaFree(dev_c);
     cudaFree(dev_a);
@@ -56,16 +56,20 @@ cudaError_t runMatrix3dAdd(int *c, const int *a, const int *b, uint32_t m, uint3
     return cudaStatus;
 }
 
-void checkMatrix3dAdd(const int *c, const int* a, const int* b, const int M, const int N, const int P)
+void checkMatrix3dAdd(const float *c, const float* a, const float* b, const int M, const int N, const int P)
 {
     for (int k = 0; k < P; k++) {
         for (int i = 0; i < M; i++) {
             for (int j = 0; j < N; j++) {
                 int index = k * M * N + i * N + j;
-                int expected = a[index] + b[index];
-                if (expected != c[index]) {
-                    int result = c[index];
-                    printf("Mismatch between %d, %d at index %d\n", result, c[index], index);
+                float expected = a[index] + b[index];
+                float tolerance = std::numeric_limits<float>::min();
+                if (std::abs(expected - c[index]) > (2 * tolerance)) {
+                    float result = c[index];
+                    printf("Mismatch between %f, %f at index %d\n", result, c[index], index);
+                    float error = std::abs(expected - c[index]);
+                    printf("Error is %f\n", error);
+                    assert(true);
                 }
             }
         }

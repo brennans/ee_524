@@ -318,7 +318,7 @@ int main()
         std::vector<int> a(size);
         std::vector<int> b(size);
         for (int j = 0; j < size; j++) {
-            a[j] = j;
+            a[j] = j + 0.1;
             b[j] = j;
         }
         std::vector<int> c(size, 0);
@@ -348,13 +348,13 @@ int main()
         uint32_t size = currentDim.x * currentDim.y;
 
         // Create vectors with test case sizes
-        std::vector<int> a(size);
-        std::vector<int> b(size);
+        std::vector<float> a(size);
+        std::vector<float> b(size);
         for (int j = 0; j < size; j++) {
-            a[j] = j;
-            b[j] = j;
+            a[j] = static_cast<float>(j) + 0.1;
+            b[j] = j + 1000000;
         }
-        std::vector<int> c(size, 0);
+        std::vector<float> c(size, 0);
 
         uint32_t threadDim = std::min(currentDim.x, 8u);
 

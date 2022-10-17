@@ -29,4 +29,9 @@ ans = ceil(8000 / 1024) * 1024
    index is not in sequential order so they could run in any order. It is probably not safe to 
    assume that threads or blocks are scheduled in any particular order.
 
-#### sax
+#### Host-Side Result Verification
+
+1. For the SAXPY kernel, results will fail on larger values at N = 1e7. This can require a tolerance
+value of up to 10.  The 3D matrix works for values that are equal to indexes down to 
+   std::numeric_limit<float>::min(). The SAXPY has the most severe result disagreements likely due
+   to the multiplication.
