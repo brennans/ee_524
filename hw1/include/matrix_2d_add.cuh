@@ -1,6 +1,7 @@
 #ifndef HW1_MATRIX_2D_ADD_CUH
 #define HW1_MATRIX_2D_ADD_CUH
 
+
 __global__ void matrix_2d_add(int *c, const int* a, const int* b, const int M, const int N)
 {
 

@@ -12,6 +12,7 @@
 
 #include "check_cuda.h"
 #include "matrix_2d_add.cuh"
+#include "matrix_3d_add.cuh"
 
 
 bool equals(double x, double y, double absTol, double relTol){
@@ -335,7 +336,37 @@ int main()
     }
 
     // Run the 3D Grid Add
+    std::array<dim3, 3> test_sizes_3d {{
+                                               {{3, 3, 3}},
+                                               {{100, 100, 100}},
+                                               {{1000, 1000, 1000}}
+                                       }};
+    for (int i = 0; i < test_sizes.size(); i++) {
+        printf("Run %d\n", i);
 
+        dim3 currentDim = test_sizes_2d[i];
+        uint32_t size = currentDim.x * currentDim.y;
+
+        // Create vectors with test case sizes
+        std::vector<int> a(size);
+        std::vector<int> b(size);
+        for (int j = 0; j < size; j++) {
+            a[j] = j;
+            b[j] = j;
+        }
+        std::vector<int> c(size, 0);
+
+        uint32_t threadDim = std::min(currentDim.x, 8u);
+
+        cudaStatus = runMatrix3dAdd(c.data(), a.data(), b.data(), currentDim.y, currentDim.x, currentDim.z, threadDim);
+        if (cudaStatus != cudaSuccess) {
+            fprintf(stderr, "runCudaKernel failed for runMatrix2dAdd!");
+            return 1;
+        }
+
+        checkMatrix3dAdd(c.data(), a.data(), b.data(), currentDim.y, currentDim.x, currentDim.z);
+
+    }
 
 
 
