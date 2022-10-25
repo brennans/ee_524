@@ -1,0 +1,4 @@
+C:/Users/brenn/workspace/ee_524/hw2_vs/CudaRuntime1/cmake-build-debug/CMakeFiles/kernels.dir
+C:/Users/brenn/workspace/ee_524/hw2_vs/CudaRuntime1/cmake-build-debug/CMakeFiles/main.dir
+C:/Users/brenn/workspace/ee_524/hw2_vs/CudaRuntime1/cmake-build-debug/CMakeFiles/edit_cache.dir
+C:/Users/brenn/workspace/ee_524/hw2_vs/CudaRuntime1/cmake-build-debug/CMakeFiles/rebuild_cache.dir
