@@ -142,7 +142,7 @@ __global__ void mmultiSharedMemoryKernel(float *P, const float *M, const float *
         float result = 0;
 
         // Move tile around and load elements
-        for (int tile_index = 0; tile_index < ceil(m / (float) MATRIX_TILE_WIDTH); tile_index++) {
+        for (int tile_index = 0; tile_index < (m + MATRIX_TILE_WIDTH - 1) / MATRIX_TILE_WIDTH; tile_index++) {
             // Check we have valid index in M tile and load M tile element
             if ((tile_index * MATRIX_TILE_WIDTH +  threadIdx.x) < m) {
                 M_tile[threadIdx.y][threadIdx.x] = M[row * m + tile_index * MATRIX_TILE_WIDTH + threadIdx.x];
@@ -215,8 +215,8 @@ cudaError_t runMatrixMultiplyKernel(MMKernel type, float *P, const float *M, con
     checkCuda(cudaMemcpy(dev_N, N, sizeof(float) * m * n, cudaMemcpyHostToDevice));
 
     // Launch kernel
-    int TILE_SIZE = 32;
-    dim3 numThreads{32, 32, 1};
+    int TILE_SIZE = MATRIX_TILE_WIDTH;
+    dim3 numThreads{MATRIX_TILE_WIDTH, MATRIX_TILE_WIDTH, 1};
     dim3 numBlocks{static_cast<uint32_t>((l + TILE_SIZE - 1) / TILE_SIZE),
                    static_cast<uint32_t>(n + TILE_SIZE - 1) / TILE_SIZE,
                    1};
@@ -263,7 +263,11 @@ bool matrix_equality(float *M, float *N, const int m, const int n) {
     bool equal = true;
     for (int i = 0; i < m; i++) {
         for (int j = 0; j < n; j++) {
-            equal &= compare_floats(M[i * m + j], N[i * m + j], .1);
+            bool result = compare_floats(M[i * m + j], N[i * m + j], .1);
+            equal &= result;
+            if (result == false) {
+                printf("Row: %d, Column: %d\n", i, j);
+            }
         }
     }
     return equal;
@@ -295,9 +299,9 @@ int main(void) {
 
     TestMatrixMultiplication();
 
-    int l = 1000;
-    int m = 1000;
-    int n = 1000;
+    int l = 33;
+    int m = 33;
+    int n = 33;
     float *M = (float *) malloc(l * m * sizeof(float));
     float *N = (float *) malloc(m * n * sizeof(float));
     float *P = (float *) malloc(l * n * sizeof(float));
