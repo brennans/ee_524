@@ -174,17 +174,17 @@ __global__ void mmultiSharedMemoryKernel(float *P, const float *M, const float *
     }
 }
 
-#define IN_MATRIX_L 32
-#define IN_MATRIX_M 32
-#define IN_MATRIX_N 32
+#define IN_MATRIX_L 8
+#define IN_MATRIX_M 8
+#define IN_MATRIX_N 8
 
-#define M_TILE_COLUMNS 32
-#define M_TILE_ROWS 32
+#define M_TILE_COLUMNS 8
+#define M_TILE_ROWS 4
 #define N_TILE_COLUMNS M_TILE_ROWS
 #define N_TILE_ROWS M_TILE_COLUMNS
 
-#define NUM_THREADS_X 32
-#define NUM_THREADS_Y 32
+#define NUM_THREADS_X 8
+#define NUM_THREADS_Y 4
 
 
 /*
@@ -208,7 +208,7 @@ __global__ void mmultiTiledKernel(float *P, const float *M, const float *N, cons
     int blockHeight = blockDim.y;
 
 
-    if (blockWidth > M_TILE_COLUMNS || blockHeight > M_TILE_COLUMNS) {
+    if (blockWidth > M_TILE_COLUMNS || blockHeight > M_TILE_ROWS) {
         // Not enough space for all threads to run cooperatively out of the shared memory
 
     } if (blockWidth < M_TILE_COLUMNS || blockHeight < M_TILE_ROWS) {
@@ -222,7 +222,9 @@ __global__ void mmultiTiledKernel(float *P, const float *M, const float *N, cons
         float result = 0;
 
         // Phase tile around and load elements. The number of phases is determined by the m (inner) dimension.
-        for (int tile_index = 0; tile_index < (m + M_TILE_COLUMNS - 1) / M_TILE_COLUMNS; tile_index++) {
+        int num_phases = (m + M_TILE_COLUMNS - 1) / M_TILE_COLUMNS;
+
+        for (int tile_index = 0; tile_index < num_phases; tile_index++) {
             // Check we have valid index in M tile and load M tile element
             if (output_row < l && (tile_index * M_TILE_COLUMNS + threadIdx.x) < m) {
                 M_tile[threadIdx.y][threadIdx.x] = M[output_row * m + tile_index * M_TILE_COLUMNS + threadIdx.x];
@@ -230,10 +232,13 @@ __global__ void mmultiTiledKernel(float *P, const float *M, const float *N, cons
                 M_tile[threadIdx.y][threadIdx.x] = 0.0f;
             }
             // Check we have a valid index in N tile and load N tile element
-            if (output_column < n && (tile_index * N_TILE_ROWS + threadIdx.y) < m) {
-                N_tile[threadIdx.y][threadIdx.x] = N[(tile_index * N_TILE_ROWS + threadIdx.y) * n + output_column];
+            if (output_column < n && (tile_index * N_TILE_ROWS + threadIdx.x) < m) {
+
+                int N_index = (tile_index * N_TILE_ROWS + threadIdx.x) * n +  blockWidth * blockIdx.x + threadIdx.y;
+                printf("Thread X: %d, Y: %d, Block: X %d, Y %d, N Index: %d\n", threadIdx.x, threadIdx.y, blockIdx.x, blockIdx.y, N_index);
+                N_tile[threadIdx.x][threadIdx.y] = N[N_index];
             } else {
-                N_tile[threadIdx.y][threadIdx.x] = 0.0f;
+                N_tile[threadIdx.x][threadIdx.y] = 0.0f;
             }
             __syncthreads();
 
@@ -308,6 +313,11 @@ cudaError_t runMatrixMultiplyKernel(MMKernel type, float *P, const float *M, con
     dim3 numBlocks{static_cast<uint32_t>((n + NUM_THREADS_X - 1) / NUM_THREADS_X),
                    static_cast<uint32_t>(l + NUM_THREADS_Y - 1) / NUM_THREADS_Y,
                    1};
+
+    printf("Input Matrix Dimensions: (%d x %d) and (%d x %d)\n", l, m, m, n);
+    printf("Block Dimensions: (%d x %d)\n", numThreads.y, numThreads.x);
+    printf("Grid Dimensions: (%d x %d)\n\n", numBlocks.y, numBlocks.x);
+
     if (type == MMKernel::Naive) {
         mmultiKernel<<<numBlocks, numThreads>>>(dev_P, dev_M, dev_N, l, m, n);
     } else if (type == MMKernel::Shared) {
@@ -332,7 +342,20 @@ void init_matrix(float *M, const int m, const int n) {
 
     for (int i = 0; i < m; i++) {
         for (int j = 0; j < n; j++) {
-            M[i * n + j] = static_cast<float>(i + 1) / static_cast<float>(j + 1);
+            //M[i * n + j] = static_cast<float>(i + 1) / static_cast<float>(j + 1);
+            M[i * n + j] = i * m + j + 1;
+        }
+    }
+}
+
+void init_identity_matrix(float *M, const int m, const int n) {
+
+    for (int i = 0; i < m; i++) {
+        for (int j = 0; j < n; j++) {
+            if (i == j)
+                M[i * n + j] = 1.0f;
+            else
+                M[i*n +j ] = 0.0f;
         }
     }
 }
@@ -341,20 +364,20 @@ bool compare_floats(float x, float y, float absTol) {
     if (std::abs(x - y) <= absTol) {
         return true;
     } else {
-        printf("Check failed: %f, %f\n", x, y);
+        //printf("Check failed: %f, %f\n", x, y);
         return false;
     }
 }
 
 
-bool matrix_equality(float *M, float *N, const int m, const int n) {
+bool matrix_equality(float *M, float *N, const int m, const int n, bool verbose) {
     bool equal = true;
     for (int i = 0; i < m; i++) {
         for (int j = 0; j < n; j++) {
             bool result = compare_floats(M[i * m + j], N[i * m + j], .1);
             equal &= result;
-            if (result == false) {
-                printf("Row: %d, Column: %d\n", i, j);
+            if (result == false && verbose == true) {
+                printf("Row: %4d, Column: %4d,  %10f, %10f\n", i, j, M[i * m + j], N[i * m + j]);
             }
         }
     }
@@ -383,19 +406,19 @@ int main(void) {
         return -1;
     }
 
-    // Single bifurcation.
-    cudaStatus = runBifucationKernel(BifurcationType::Single, 1024);
-    if (cudaStatus != cudaSuccess) {
-        fprintf(stderr, "Bifurcation failed!");
-        return 1;
-    }
-
-    // N bifurcation.
-    cudaStatus = runBifucationKernel(BifurcationType::N, 1024);
-    if (cudaStatus != cudaSuccess) {
-        fprintf(stderr, "Bifurcation failed!");
-        return 1;
-    }
+    //// Single bifurcation.
+    //cudaStatus = runBifucationKernel(BifurcationType::Single, 1024);
+    //if (cudaStatus != cudaSuccess) {
+    //    fprintf(stderr, "Bifurcation failed!");
+    //    return 1;
+    //}
+    //
+    //// N bifurcation.
+    //cudaStatus = runBifucationKernel(BifurcationType::N, 1024);
+    //if (cudaStatus != cudaSuccess) {
+    //    fprintf(stderr, "Bifurcation failed!");
+    //    return 1;
+    //}
 
     TestMatrixMultiplication();
 
@@ -410,7 +433,7 @@ int main(void) {
     auto P_shared = (float *) malloc(l * n * sizeof(float));
     float *P_host = (float *) malloc(l * n * sizeof(float));
     init_matrix(M, l, m);
-    init_matrix(N, m, n);
+    init_identity_matrix(N, m, n);
 
     //print_matrix(P_host, l, n);
 
@@ -431,7 +454,7 @@ int main(void) {
     //printf("Max error for naive implementation: %f\n", error_0);
 
     printf("Checking equality for shared memory implementation.\n");
-    bool ret = matrix_equality(P_host, P_shared, l, n);
+    bool ret = matrix_equality(P_host, P_shared, l, n, true);
     float error_1 = matrix_max_error(P_host, P_shared, l, n);
     if (ret == true) {
         printf("No difference found.\n");

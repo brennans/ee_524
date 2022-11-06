@@ -38,3 +38,18 @@ For the 7 blocks where there is a not a full tile of threads (Type 2), the first
 Type 2 blocks: 340 / 392 warp phases have control divergence. 86.7% of warp-phases.
 
 Total: 340 / 2734 warp-phases have control divergence. 12.44% of warp-phases.
+
+### Nsight Compute Divergence
+
+Divergence can be identified when the Theoretical Occupancy is much greater than the achieved 
+occupancy. The theoretical and achieved warps also indicate divergence when there is a large gap. 
+Warp cycles per issued instruction also goes down with divergence. Average active threads per warp
+also goes down. Compute throughput goes down with increased divergence.
+
+
+## MMulti
+
+Max error observed:
+- P : 100x100, k = 100, Error: 0.000001
+- P : 1000x1000, k=1000, Error: 0.000012
+- P : 2000x3000, k = 2500, Error: 0.000023
